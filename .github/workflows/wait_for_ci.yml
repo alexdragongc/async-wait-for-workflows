@@ -25,4 +25,21 @@ jobs:
 
       - name: Dump event data
         run: |
-            echo "calling commit: ${{ toJson(github.event.workflow_run.head_sha) }}"
+          echo "calling commit: ${{ toJson(github.event.workflow_run.head_sha) }}"
+          echo "calling workflow: ${{ toJson(github.event.workflow_run.workflow) }}"
+          echo "calling run_id: ${{ toJson(github.event.workflow_run.run_id) }}"
+
+      - name: Get workflow dependencies
+        id: workflow_dependencies
+        run: |
+          # Extract path from "owner/repo/.github/workflows/file.yml@refs/heads/main"
+          WORKFLOW_PATH="${GITHUB_WORKFLOW_REF#*/}"   # strip "owner/"
+          WORKFLOW_PATH="${WORKFLOW_PATH#*/}"         # strip "repo/"
+          WORKFLOW_PATH="${WORKFLOW_PATH%@*}"         # strip "@ref"
+
+          WORKFLOWS=$(yq -o=json '.on.workflow_run.workflows' "$WORKFLOW_PATH")
+          echo "list=$WORKFLOWS" >> $GITHUB_OUTPUT
+
+      - name: Dump workflow dependencies
+        run: |
+          echo "workflow dependencies: ${{ toJson(steps.workflow_dependencies.outputs.list) }}"
