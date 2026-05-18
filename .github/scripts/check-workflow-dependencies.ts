@@ -40,10 +40,6 @@ export type RunFetcher = (
   token: string
 ) => Promise<WorkflowRun[]>;
 
-export function isRunSuccessful(run: WorkflowRun): boolean {
-  return run.status === "completed" && run.conclusion === "success";
-}
-
 export function findRunForWorkflow(
   runs: WorkflowRun[],
   name: string
@@ -86,8 +82,8 @@ function formatRunDetail(run: WorkflowRun | undefined): string {
     : "no run found";
 }
 
-function logAndCheck(run: WorkflowRun | undefined, name: string): boolean {
-  const passed = run !== undefined && isRunSuccessful(run);
+function logAndCheck(run: WorkflowRun | undefined, name: string, mustPass: boolean): boolean {
+  const passed = run !== undefined && run.status === "completed" && (run.conclusion === "success" || !mustPass);
   console.log(`${name} -> ${formatRunDetail(run)} -> ${passed ? "passed" : "failed"}`);
   return passed;
 }
@@ -97,31 +93,36 @@ export async function checkAllDependencies(
   headSha: string,
   repo: string,
   token: string,
+  mustPass: boolean,
   fetchRuns: RunFetcher = fetchWorkflowRuns
 ): Promise<boolean> {
   const runs = await fetchRuns(repo, headSha, token);
   return dependencies.every((name) =>
-    logAndCheck(findRunForWorkflow(runs, name), name)
+    logAndCheck(findRunForWorkflow(runs, name), name, mustPass)
   );
 }
 
 function readEnvVars() {
-  const { HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY } = process.env;
-  if (!HEAD_SHA || !DEPENDENCIES || !GH_TOKEN || !GITHUB_REPOSITORY)
+  const { HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY, DEPENDENCIES_MUST_PASS } = process.env;
+    if (!HEAD_SHA || !DEPENDENCIES || !GH_TOKEN || !GITHUB_REPOSITORY || !DEPENDENCIES_MUST_PASS)
     throw new Error(
-      "Missing required env vars: HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY"
+      "Missing required env vars: HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY, DEPENDENCIES_MUST_PASS"
     );
   return {
     headSha: HEAD_SHA,
     dependencies: JSON.parse(DEPENDENCIES) as string[],
     token: GH_TOKEN,
     repo: GITHUB_REPOSITORY,
+    mustPass: DEPENDENCIES_MUST_PASS === "true",
   };
 }
 
 if (import.meta.main) {
-  const { headSha, dependencies, token, repo } = readEnvVars();
-  const allPassed = await checkAllDependencies(dependencies, headSha, repo, token);
+  const { headSha, dependencies, token, repo, mustPass } = readEnvVars();
+
+  console.log({ dependencies, headSha, repo, mustPass });
+
+  const allPassed = await checkAllDependencies(dependencies, headSha, repo, token, mustPass);
   if (!allPassed) {
     console.error("Not all dependencies passed.");
     process.exit(1);
