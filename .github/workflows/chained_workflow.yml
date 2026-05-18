@@ -7,8 +7,27 @@ jobs:
   hello-world:
     runs-on: ubuntu-latest
     steps:
+      - name: Set pending status
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA \
+            -f state=pending \
+            -f context="$GITHUB_WORKFLOW" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Hello world
         run: echo "Hello, world!"
+
+      - name: Set final status
+        if: always()
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA \
+            -f state=${{ job.status == 'success' && 'success' || 'failure' }} \
+            -f context="$GITHUB_WORKFLOW" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}
