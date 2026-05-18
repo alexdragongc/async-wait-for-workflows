@@ -3,6 +3,9 @@ name: Chained Workflow
 on:
   workflow_dispatch:
 
+permissions:
+  statuses: write
+
 jobs:
   hello-world:
     runs-on: ubuntu-latest
