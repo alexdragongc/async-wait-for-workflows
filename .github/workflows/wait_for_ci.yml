@@ -37,7 +37,7 @@ jobs:
           WORKFLOW_PATH="${WORKFLOW_PATH#*/}"         # strip "repo/"
           WORKFLOW_PATH="${WORKFLOW_PATH%@*}"         # strip "@ref"
 
-          WORKFLOWS=$(yq -o=json '.on.workflow_run.workflows' "$WORKFLOW_PATH")
+          WORKFLOWS=$(yq -o=json -I=0 '.on.workflow_run.workflows' "$WORKFLOW_PATH")
           echo "list=$WORKFLOWS" >> $GITHUB_OUTPUT
 
       - name: Dump workflow dependencies
