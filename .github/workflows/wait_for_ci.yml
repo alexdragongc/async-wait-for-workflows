@@ -41,11 +41,10 @@ jobs:
           echo "list=$WORKFLOWS" >> $GITHUB_OUTPUT
 
       - name: Check all workflow dependencies status
+        id: check_deps
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           DEPENDENCIES: ${{ steps.workflow_dependencies.outputs.list }}
-          # Whether it is enough to wait for workflows to complete (regardless
-          # of their conclusion), or whether we need them all to succeed
-          DEPENDENCIES_MUST_PASS: false
         run: bun .github/scripts/check-workflow-dependencies.ts
+        # Outputs: all_completed, all_passed, workflow_statuses

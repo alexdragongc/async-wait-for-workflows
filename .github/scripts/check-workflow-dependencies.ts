@@ -1,3 +1,5 @@
+import { appendFileSync } from "fs";
+
 // https://docs.github.com/en/rest/actions/workflow-runs#list-workflow-runs-for-a-repository
 
 // Possible run status values:
@@ -29,16 +31,18 @@ type RunConclusion =
   | null;
 
 export interface WorkflowRun {
+  id: number;
   name: string;
   status: RunStatus;
   conclusion: RunConclusion;
 }
 
-export type RunFetcher = (
-  repo: string,
-  headSha: string,
-  token: string,
-) => Promise<WorkflowRun[]>;
+export interface WorkflowStatus {
+  runId: string;
+  name: string;
+  status: RunStatus;
+  conclusion: RunConclusion;
+}
 
 export function findRunForWorkflow(
   runs: WorkflowRun[],
@@ -70,91 +74,77 @@ export async function fetchWorkflowRuns(
   token: string,
 ): Promise<WorkflowRun[]> {
   const response = await fetchRunsResponse(repo, headSha, token);
-  if (!response.ok)
+  if (!response.ok) {
     throw new Error(
       `GitHub API error: ${response.status} ${response.statusText}`,
     );
+  }
   const data = (await response.json()) as { workflow_runs: WorkflowRun[] };
   return data.workflow_runs;
 }
 
-function formatRunDetail(run: WorkflowRun | undefined): string {
-  return run
-    ? `status=${run.status}, conclusion=${run.conclusion}`
-    : "no run found";
-}
-
-function logAndCheck(
+function mapRunToStatus(
   run: WorkflowRun | undefined,
   name: string,
-  mustPass: boolean,
-): boolean {
-  const passed =
-    run !== undefined &&
-    run.status === "completed" &&
-    (run.conclusion === "success" || !mustPass);
-  console.log(
-    `${name} -> ${formatRunDetail(run)} -> ${passed ? "passed" : "failed"}`,
-  );
-  return passed;
+): WorkflowStatus {
+  if (!run) {
+    return { runId: "", name, status: "queued", conclusion: null };
+  }
+  return { runId: String(run.id), name, status: run.status, conclusion: run.conclusion };
 }
 
-export async function checkAllDependencies(
+export function buildWorkflowStatuses(
+  runs: WorkflowRun[],
   dependencies: string[],
-  headSha: string,
-  repo: string,
-  token: string,
-  mustPass: boolean,
-  fetchRuns: RunFetcher = fetchWorkflowRuns,
-): Promise<boolean> {
-  const runs = await fetchRuns(repo, headSha, token);
-  return dependencies.every((name) =>
-    logAndCheck(findRunForWorkflow(runs, name), name, mustPass),
+): WorkflowStatus[] {
+  return dependencies.map((name) => mapRunToStatus(findRunForWorkflow(runs, name), name));
+}
+
+export function isAllCompleted(statuses: WorkflowStatus[]): boolean {
+  return statuses.every((s) => s.status === "completed");
+}
+
+export function isAllPassed(statuses: WorkflowStatus[]): boolean {
+  return statuses.every(
+    (s) => s.status === "completed" && s.conclusion === "success",
   );
 }
 
 function readEnvVars() {
-  const {
-    HEAD_SHA,
-    DEPENDENCIES,
-    GH_TOKEN,
-    GITHUB_REPOSITORY,
-    DEPENDENCIES_MUST_PASS,
-  } = process.env;
-  if (
-    !HEAD_SHA ||
-    !DEPENDENCIES ||
-    !GH_TOKEN ||
-    !GITHUB_REPOSITORY ||
-    !DEPENDENCIES_MUST_PASS
-  )
+  const { HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY } = process.env;
+  if (!HEAD_SHA || !DEPENDENCIES || !GH_TOKEN || !GITHUB_REPOSITORY) {
     throw new Error(
-      "Missing required env vars: HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY, DEPENDENCIES_MUST_PASS",
+      "Missing required env vars: HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY",
     );
+  }
   return {
     headSha: HEAD_SHA,
     dependencies: JSON.parse(DEPENDENCIES) as string[],
     token: GH_TOKEN,
     repo: GITHUB_REPOSITORY,
-    mustPass: DEPENDENCIES_MUST_PASS === "true",
   };
 }
 
-if (import.meta.main) {
-  const { headSha, dependencies, token, repo, mustPass } = readEnvVars();
-
-  console.log({ dependencies, headSha, repo, mustPass });
-
-  const allPassed = await checkAllDependencies(
-    dependencies,
-    headSha,
-    repo,
-    token,
-    mustPass,
-  );
-  if (!allPassed) {
-    console.error("Not all dependencies passed.");
-    process.exit(1);
+function writeGithubOutput(key: string, value: string): void {
+  const outputFile = process.env.GITHUB_OUTPUT;
+  if (!outputFile) {
+    throw new Error("GITHUB_OUTPUT is not set");
   }
-  console.log("All dependencies passed.");
+  appendFileSync(outputFile, `${key}=${value}\n`);
+}
+
+if (import.meta.main) {
+  const { headSha, dependencies, token, repo } = readEnvVars();
+  console.log({ dependencies, headSha, repo });
+
+  const workflowRuns = await fetchWorkflowRuns(repo, headSha, token);
+  const workflowStatuses = buildWorkflowStatuses(workflowRuns, dependencies);
+  const allCompleted = isAllCompleted(workflowStatuses);
+  const allPassed = isAllPassed(workflowStatuses);
+
+  writeGithubOutput("all_completed", String(allCompleted));
+  writeGithubOutput("all_passed", String(allPassed));
+  writeGithubOutput("workflow_statuses", JSON.stringify(workflowStatuses));
+  console.log(`Dependencies check complete. all_completed=${allCompleted}, all_passed=${allPassed}`);
+  console.log(workflowStatuses);
 }

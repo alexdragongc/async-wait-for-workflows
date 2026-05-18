@@ -1,33 +1,26 @@
-import { describe, it, expect, mock } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import {
-  isRunSuccessful,
   findRunForWorkflow,
-  checkAllDependencies,
+  buildWorkflowStatuses,
+  isAllCompleted,
+  isAllPassed,
   type WorkflowRun,
-  type RunFetcher,
+  type WorkflowStatus,
 } from "./check-workflow-dependencies";
 
 const makeRun = (
   name: string,
   status: WorkflowRun["status"],
   conclusion: WorkflowRun["conclusion"],
-): WorkflowRun => ({ name, status, conclusion });
+  id = 1,
+): WorkflowRun => ({ id, name, status, conclusion });
 
-describe("isRunSuccessful", () => {
-  it("Returns true for a completed+success run", () => {
-    expect(isRunSuccessful(makeRun("CI A", "completed", "success"))).toBe(true);
-  });
-
-  it("Returns false for an in_progress run", () => {
-    expect(isRunSuccessful(makeRun("CI A", "in_progress", null))).toBe(false);
-  });
-
-  it("Returns false for a completed+failure run", () => {
-    expect(isRunSuccessful(makeRun("CI A", "completed", "failure"))).toBe(
-      false,
-    );
-  });
-});
+const makeStatus = (
+  name: string,
+  status: WorkflowStatus["status"],
+  conclusion: WorkflowStatus["conclusion"],
+  runId = "1",
+): WorkflowStatus => ({ runId, name, status, conclusion });
 
 describe("findRunForWorkflow", () => {
   it("Returns the matching run by workflow name", () => {
@@ -35,7 +28,7 @@ describe("findRunForWorkflow", () => {
       makeRun("CI A", "completed", "success"),
       makeRun("CI B", "completed", "success"),
     ];
-    expect(findRunForWorkflow(runs, "CI A")).toEqual(runs[0]);
+    expect(findRunForWorkflow(runs, "CI B")).toEqual(runs[1]);
   });
 
   it("Returns undefined when no run matches the given name", () => {
@@ -44,36 +37,77 @@ describe("findRunForWorkflow", () => {
   });
 });
 
-describe("checkAllDependencies", () => {
-  const callWith = (runs: WorkflowRun[], deps = ["CI A", "CI B"]) => {
-    const fetchRuns: RunFetcher = mock(async () => runs);
-    return checkAllDependencies(
-      deps,
-      "sha123",
-      "owner/repo",
-      "token",
-      fetchRuns,
-    );
-  };
-
-  it("Returns true when all dependencies completed successfully", async () => {
-    const runs = [
-      makeRun("CI A", "completed", "success"),
-      makeRun("CI B", "completed", "success"),
-    ];
-    expect(await callWith(runs)).toBe(true);
+describe("buildWorkflowStatuses", () => {
+  it("Maps a found run to its corresponding WorkflowStatus", () => {
+    const runs = [makeRun("CI A", "completed", "success", 42)];
+    expect(buildWorkflowStatuses(runs, ["CI A"])).toEqual([
+      { runId: "42", name: "CI A", status: "completed", conclusion: "success" },
+    ]);
   });
 
-  it("Returns false when one dependency has a failed conclusion", async () => {
-    const runs = [
-      makeRun("CI A", "completed", "success"),
-      makeRun("CI B", "completed", "failure"),
-    ];
-    expect(await callWith(runs)).toBe(false);
+  it("Maps a missing dependency as queued with an empty runId", () => {
+    expect(buildWorkflowStatuses([], ["CI A"])).toEqual([
+      { runId: "", name: "CI A", status: "queued", conclusion: null },
+    ]);
   });
 
-  it("Returns false when a dependency has no matching run", async () => {
-    const runs = [makeRun("CI B", "completed", "success")];
-    expect(await callWith(runs)).toBe(false);
+  it("Handles a mix of found and missing runs", () => {
+    const runs = [makeRun("CI B", "completed", "success", 7)];
+    expect(buildWorkflowStatuses(runs, ["CI A", "CI B"])).toEqual([
+      { runId: "", name: "CI A", status: "queued", conclusion: null },
+      { runId: "7", name: "CI B", status: "completed", conclusion: "success" },
+    ]);
+  });
+});
+
+describe("isAllCompleted", () => {
+  it("Returns true when all statuses are completed", () => {
+    const statuses = [
+      makeStatus("CI A", "completed", "success"),
+      makeStatus("CI B", "completed", "failure"),
+    ];
+    expect(isAllCompleted(statuses)).toBe(true);
+  });
+
+  it("Returns false when any status is not completed", () => {
+    const statuses = [
+      makeStatus("CI A", "completed", "success"),
+      makeStatus("CI B", "in_progress", null),
+    ];
+    expect(isAllCompleted(statuses)).toBe(false);
+  });
+
+  it("Returns true for an empty list", () => {
+    expect(isAllCompleted([])).toBe(true);
+  });
+});
+
+describe("isAllPassed", () => {
+  it("Returns true when all statuses are completed with success", () => {
+    const statuses = [
+      makeStatus("CI A", "completed", "success"),
+      makeStatus("CI B", "completed", "success"),
+    ];
+    expect(isAllPassed(statuses)).toBe(true);
+  });
+
+  it("Returns false when any status has a non-success conclusion", () => {
+    const statuses = [
+      makeStatus("CI A", "completed", "success"),
+      makeStatus("CI B", "completed", "failure"),
+    ];
+    expect(isAllPassed(statuses)).toBe(false);
+  });
+
+  it("Returns false when any status is not completed", () => {
+    const statuses = [
+      makeStatus("CI A", "completed", "success"),
+      makeStatus("CI B", "in_progress", null),
+    ];
+    expect(isAllPassed(statuses)).toBe(false);
+  });
+
+  it("Returns true for an empty list", () => {
+    expect(isAllPassed([])).toBe(true);
   });
 });
