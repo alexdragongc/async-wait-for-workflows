@@ -1,0 +1,40 @@
+name: Run after CI A and CI B
+
+on:
+  workflow_run:
+    #https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run
+    # This fires after either workflow from the list fires its workflow event
+    # (in that case, "complete"). Meaning: this is an OR rule. To make an AND
+    # rule, we need to check the status of all the dependencies from the list.
+    workflows: ["CI A", "CI B"]
+    types: [completed]
+
+concurrency:
+  # TODO this is not actually correct, the workflow can be triggered
+  # concurrrently by different events, like two pull requests for which it both
+  # needs to run.
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Hello world
+        run: echo "Hello, world!"
+
+      - name: Dump event data
+        run: |
+            echo "event: ${{ toJson(github.event) }}"
+            echo "workflow: ${{ toJson(github.workflow) }}"
+            echo "run: ${{ toJson(github.run) }}"
+            echo "job: ${{ toJson(github.job) }}"
+            echo "step: ${{ toJson(github.step) }}"
+            echo "action: ${{ toJson(github.action) }}"
+            echo "actor: ${{ toJson(github.actor) }}"
+            echo "repository: ${{ toJson(github.repository) }}"
+            echo "sha: ${{ toJson(github.sha) }}"
+            echo "ref: ${{ toJson(github.ref) }}"

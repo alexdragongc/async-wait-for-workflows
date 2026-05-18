@@ -1,0 +1,16 @@
+name: CI A
+
+on: [push, pull_request]
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Artificial 30 seconds delay
+        run: sleep 30
+
+      - name: Hello world
+        run: echo "Hello, world!"
