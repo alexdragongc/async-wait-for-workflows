@@ -65,6 +65,6 @@ jobs:
           echo "Triggering workflow for target commit: ${{ github.event.workflow_run.head_sha }}"
           gh workflow run chained_workflow.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref=${{ github.event.workflow_run.head_sha }}
+            --ref=${{ github.event.workflow_run.head_branch }}
         env:
           GH_TOKEN: ${{ github.token }}
