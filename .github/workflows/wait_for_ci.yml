@@ -67,4 +67,4 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --ref=${{ github.event.workflow_run.head_branch }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.DISPATCH_PAT }}
