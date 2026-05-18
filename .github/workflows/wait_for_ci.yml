@@ -16,6 +16,10 @@ concurrency:
 jobs:
   check-workflow-dependencies:
     runs-on: ubuntu-latest
+    outputs:
+      all_completed: ${{ steps.check_deps.outputs.all_completed }}
+      all_passed: ${{ steps.check_deps.outputs.all_passed }}
+      workflow_statuses: ${{ steps.check_deps.outputs.workflow_statuses }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -46,8 +50,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           DEPENDENCIES: ${{ steps.workflow_dependencies.outputs.list }}
-        run: bun .github/scripts/check-workflow-dependencies.ts
         # Outputs: all_completed, all_passed, workflow_statuses
+        run: bun .github/scripts/check-workflow-dependencies.ts
 
   trigger-chained-workflow:
     needs: check-workflow-dependencies
