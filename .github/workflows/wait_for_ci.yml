@@ -20,6 +20,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Hello world
         run: echo "Hello, world!"
 
@@ -43,3 +48,10 @@ jobs:
       - name: Dump workflow dependencies
         run: |
           echo "workflow dependencies: ${{ toJson(steps.workflow_dependencies.outputs.list) }}"
+
+      - name: Check all workflow dependencies status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPENDENCIES: ${{ steps.workflow_dependencies.outputs.list }}
+        run: bun .github/scripts/check-workflow-dependencies.ts
