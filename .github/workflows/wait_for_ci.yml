@@ -10,10 +10,7 @@ on:
     types: [completed]
 
 concurrency:
-  # TODO this is not actually correct, the workflow can be triggered
-  # concurrrently by different events, like two pull requests for which it both
-  # needs to run.
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
@@ -28,13 +25,4 @@ jobs:
 
       - name: Dump event data
         run: |
-            echo "event: ${{ toJson(github.event) }}"
-            echo "workflow: ${{ toJson(github.workflow) }}"
-            echo "run: ${{ toJson(github.run) }}"
-            echo "job: ${{ toJson(github.job) }}"
-            echo "step: ${{ toJson(github.step) }}"
-            echo "action: ${{ toJson(github.action) }}"
-            echo "actor: ${{ toJson(github.actor) }}"
-            echo "repository: ${{ toJson(github.repository) }}"
-            echo "sha: ${{ toJson(github.sha) }}"
-            echo "ref: ${{ toJson(github.ref) }}"
+            echo "calling commit: ${{ toJson(github.event.workflow_run.head_sha) }}"
