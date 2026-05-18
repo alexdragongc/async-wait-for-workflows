@@ -68,6 +68,9 @@ async function fetchRunsResponse(
   return fetch(url, { headers: buildApiHeaders(token) });
 }
 
+// TODO: handle duplicates for the same workflow (should return the latest)
+// In practice if the workflows have concurrency groups I don't think this can
+// happen. If it ever does ... Sorry 😅
 export async function fetchWorkflowRuns(
   repo: string,
   headSha: string,
