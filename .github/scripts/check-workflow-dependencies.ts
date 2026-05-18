@@ -37,12 +37,12 @@ export interface WorkflowRun {
 export type RunFetcher = (
   repo: string,
   headSha: string,
-  token: string
+  token: string,
 ) => Promise<WorkflowRun[]>;
 
 export function findRunForWorkflow(
   runs: WorkflowRun[],
-  name: string
+  name: string,
 ): WorkflowRun | undefined {
   return runs.find((run) => run.name === name);
 }
@@ -58,7 +58,7 @@ function buildApiHeaders(token: string): HeadersInit {
 async function fetchRunsResponse(
   repo: string,
   headSha: string,
-  token: string
+  token: string,
 ): Promise<Response> {
   const url = `https://api.github.com/repos/${repo}/actions/runs?head_sha=${headSha}`;
   return fetch(url, { headers: buildApiHeaders(token) });
@@ -67,11 +67,13 @@ async function fetchRunsResponse(
 export async function fetchWorkflowRuns(
   repo: string,
   headSha: string,
-  token: string
+  token: string,
 ): Promise<WorkflowRun[]> {
   const response = await fetchRunsResponse(repo, headSha, token);
   if (!response.ok)
-    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `GitHub API error: ${response.status} ${response.statusText}`,
+    );
   const data = (await response.json()) as { workflow_runs: WorkflowRun[] };
   return data.workflow_runs;
 }
@@ -82,9 +84,18 @@ function formatRunDetail(run: WorkflowRun | undefined): string {
     : "no run found";
 }
 
-function logAndCheck(run: WorkflowRun | undefined, name: string, mustPass: boolean): boolean {
-  const passed = run !== undefined && run.status === "completed" && (run.conclusion === "success" || !mustPass);
-  console.log(`${name} -> ${formatRunDetail(run)} -> ${passed ? "passed" : "failed"}`);
+function logAndCheck(
+  run: WorkflowRun | undefined,
+  name: string,
+  mustPass: boolean,
+): boolean {
+  const passed =
+    run !== undefined &&
+    run.status === "completed" &&
+    (run.conclusion === "success" || !mustPass);
+  console.log(
+    `${name} -> ${formatRunDetail(run)} -> ${passed ? "passed" : "failed"}`,
+  );
   return passed;
 }
 
@@ -94,19 +105,31 @@ export async function checkAllDependencies(
   repo: string,
   token: string,
   mustPass: boolean,
-  fetchRuns: RunFetcher = fetchWorkflowRuns
+  fetchRuns: RunFetcher = fetchWorkflowRuns,
 ): Promise<boolean> {
   const runs = await fetchRuns(repo, headSha, token);
   return dependencies.every((name) =>
-    logAndCheck(findRunForWorkflow(runs, name), name, mustPass)
+    logAndCheck(findRunForWorkflow(runs, name), name, mustPass),
   );
 }
 
 function readEnvVars() {
-  const { HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY, DEPENDENCIES_MUST_PASS } = process.env;
-    if (!HEAD_SHA || !DEPENDENCIES || !GH_TOKEN || !GITHUB_REPOSITORY || !DEPENDENCIES_MUST_PASS)
+  const {
+    HEAD_SHA,
+    DEPENDENCIES,
+    GH_TOKEN,
+    GITHUB_REPOSITORY,
+    DEPENDENCIES_MUST_PASS,
+  } = process.env;
+  if (
+    !HEAD_SHA ||
+    !DEPENDENCIES ||
+    !GH_TOKEN ||
+    !GITHUB_REPOSITORY ||
+    !DEPENDENCIES_MUST_PASS
+  )
     throw new Error(
-      "Missing required env vars: HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY, DEPENDENCIES_MUST_PASS"
+      "Missing required env vars: HEAD_SHA, DEPENDENCIES, GH_TOKEN, GITHUB_REPOSITORY, DEPENDENCIES_MUST_PASS",
     );
   return {
     headSha: HEAD_SHA,
@@ -122,7 +145,13 @@ if (import.meta.main) {
 
   console.log({ dependencies, headSha, repo, mustPass });
 
-  const allPassed = await checkAllDependencies(dependencies, headSha, repo, token, mustPass);
+  const allPassed = await checkAllDependencies(
+    dependencies,
+    headSha,
+    repo,
+    token,
+    mustPass,
+  );
   if (!allPassed) {
     console.error("Not all dependencies passed.");
     process.exit(1);

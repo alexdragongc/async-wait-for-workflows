@@ -10,7 +10,7 @@ import {
 const makeRun = (
   name: string,
   status: WorkflowRun["status"],
-  conclusion: WorkflowRun["conclusion"]
+  conclusion: WorkflowRun["conclusion"],
 ): WorkflowRun => ({ name, status, conclusion });
 
 describe("isRunSuccessful", () => {
@@ -23,13 +23,18 @@ describe("isRunSuccessful", () => {
   });
 
   it("Returns false for a completed+failure run", () => {
-    expect(isRunSuccessful(makeRun("CI A", "completed", "failure"))).toBe(false);
+    expect(isRunSuccessful(makeRun("CI A", "completed", "failure"))).toBe(
+      false,
+    );
   });
 });
 
 describe("findRunForWorkflow", () => {
   it("Returns the matching run by workflow name", () => {
-    const runs = [makeRun("CI A", "completed", "success"), makeRun("CI B", "completed", "success")];
+    const runs = [
+      makeRun("CI A", "completed", "success"),
+      makeRun("CI B", "completed", "success"),
+    ];
     expect(findRunForWorkflow(runs, "CI A")).toEqual(runs[0]);
   });
 
@@ -42,7 +47,13 @@ describe("findRunForWorkflow", () => {
 describe("checkAllDependencies", () => {
   const callWith = (runs: WorkflowRun[], deps = ["CI A", "CI B"]) => {
     const fetchRuns: RunFetcher = mock(async () => runs);
-    return checkAllDependencies(deps, "sha123", "owner/repo", "token", fetchRuns);
+    return checkAllDependencies(
+      deps,
+      "sha123",
+      "owner/repo",
+      "token",
+      fetchRuns,
+    );
   };
 
   it("Returns true when all dependencies completed successfully", async () => {
