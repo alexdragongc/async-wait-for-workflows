@@ -25,14 +25,9 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Hello world
-        run: echo "Hello, world!"
-
-      - name: Dump event data
+      - name: Log target commit
         run: |
-          echo "calling commit: ${{ toJson(github.event.workflow_run.head_sha) }}"
-          echo "calling workflow: ${{ toJson(github.event.workflow_run.workflow) }}"
-          echo "calling run_id: ${{ toJson(github.event.workflow_run.run_id) }}"
+          echo "Calling workflow for target commit: ${{ toJson(github.event.workflow_run.head_sha) }}"
 
       - name: Get workflow dependencies
         id: workflow_dependencies
@@ -44,10 +39,6 @@ jobs:
 
           WORKFLOWS=$(yq -o=json -I=0 '.on.workflow_run.workflows' "$WORKFLOW_PATH")
           echo "list=$WORKFLOWS" >> $GITHUB_OUTPUT
-
-      - name: Dump workflow dependencies
-        run: |
-          echo "workflow dependencies: ${{ toJson(steps.workflow_dependencies.outputs.list) }}"
 
       - name: Check all workflow dependencies status
         env:
