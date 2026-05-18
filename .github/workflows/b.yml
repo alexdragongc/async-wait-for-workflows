@@ -13,8 +13,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Artificial 45 seconds delay
-        run: sleep 45
+      - name: Artificial 15 seconds delay
+        run: sleep 15
 
       - name: Hello world
         run: echo "Hello, world!"
