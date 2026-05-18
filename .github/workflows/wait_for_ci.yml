@@ -63,4 +63,5 @@ jobs:
         if: needs.check-workflow-dependencies.outputs.all_completed == 'true'
         run: |
           echo "Triggering workflow for target commit: ${{ github.event.workflow_run.head_sha }}"
-          gh run trigger --workflow="Chained Workflow" --ref=${{ github.event.workflow_run.head_sha }}
+          gh workflow run chained_workflow.yml \
+            --ref=${{ github.event.workflow_run.head_sha }}
