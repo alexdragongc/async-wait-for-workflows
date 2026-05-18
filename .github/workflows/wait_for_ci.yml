@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  hello-world:
+  check-workflow-dependencies:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -48,3 +48,15 @@ jobs:
           DEPENDENCIES: ${{ steps.workflow_dependencies.outputs.list }}
         run: bun .github/scripts/check-workflow-dependencies.ts
         # Outputs: all_completed, all_passed, workflow_statuses
+
+  trigger-chained-workflow:
+    needs: check-workflow-dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger workflow
+        # Replace "all_completed" with "all_passed" if you only want to trigger
+        # the workflow if all dependencies passed (green CI)
+        if: needs.check-workflow-dependencies.outputs.all_completed == 'true'
+        run: |
+          echo "Triggering workflow for target commit: ${{ github.event.workflow_run.head_sha }}"
+          gh run trigger --workflow="Chained Workflow" --ref=${{ github.event.workflow_run.head_sha }}
