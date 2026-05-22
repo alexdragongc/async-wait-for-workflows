@@ -17,41 +17,20 @@ jobs:
   check-workflow-dependencies:
     runs-on: ubuntu-latest
     outputs:
-      all_completed: ${{ steps.check_deps.outputs.all_completed }}
-      all_passed: ${{ steps.check_deps.outputs.all_passed }}
-      workflow_statuses: ${{ steps.check_deps.outputs.workflow_statuses }}
+      all_completed: ${{ steps.check.outputs.all_completed }}
+      all_passed: ${{ steps.check.outputs.all_passed }}
+      workflow_statuses: ${{ steps.check.outputs.workflow_statuses }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Check workflow dependencies
+        id: check
+        uses: ./.github/actions/check-workflow-dependencies
         with:
-          bun-version: latest
-
-      - name: Log target commit
-        run: |
-          echo "Calling workflow for target commit: ${{ toJson(github.event.workflow_run.head_sha) }}"
-
-      - name: Get workflow dependencies
-        id: workflow_dependencies
-        run: |
-          # Extract path from "owner/repo/.github/workflows/file.yml@refs/heads/main"
-          WORKFLOW_PATH="${GITHUB_WORKFLOW_REF#*/}"   # strip "owner/"
-          WORKFLOW_PATH="${WORKFLOW_PATH#*/}"         # strip "repo/"
-          WORKFLOW_PATH="${WORKFLOW_PATH%@*}"         # strip "@ref"
-
-          WORKFLOWS=$(yq -o=json -I=0 '.on.workflow_run.workflows' "$WORKFLOW_PATH")
-          echo "list=$WORKFLOWS" >> $GITHUB_OUTPUT
-
-      - name: Check all workflow dependencies status
-        id: check_deps
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          DEPENDENCIES: ${{ steps.workflow_dependencies.outputs.list }}
-        # Outputs: all_completed, all_passed, workflow_statuses
-        run: bun .github/scripts/check-workflow-dependencies.ts
+          head_sha: ${{ github.event.workflow_run.head_sha }}
+          caller_workflow_path: .github/workflows/wait_for_ci.yml
+          github_token: ${{ github.token }}
 
   trigger-chained-workflow:
     needs: check-workflow-dependencies

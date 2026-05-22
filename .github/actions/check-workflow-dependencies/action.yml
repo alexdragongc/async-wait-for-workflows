@@ -1,0 +1,54 @@
+name: Check Workflow Dependencies
+description: >
+  Checks whether all workflow_run dependencies for a given commit have
+  completed (and optionally passed). Designed for workflows triggered by
+  workflow_run that need AND-semantics across multiple upstream workflows.
+
+inputs:
+  head_sha:
+    required: true
+    description: The commit SHA to check workflow runs against
+  caller_workflow_path:
+    required: true
+    description: >
+      Path to the caller's workflow file relative to the repo root
+      (e.g. .github/workflows/wait_for_ci.yml). Used to extract the
+      on.workflow_run.workflows dependency list via yq.
+  github_token:
+    required: true
+    description: GitHub token for API access (typically github.token)
+
+outputs:
+  all_completed:
+    description: "'true' if every dependency workflow has completed"
+    value: ${{ steps.check_deps.outputs.all_completed }}
+  all_passed:
+    description: "'true' if every dependency workflow completed with success"
+    value: ${{ steps.check_deps.outputs.all_passed }}
+  workflow_statuses:
+    description: JSON array of per-workflow status objects
+    value: ${{ steps.check_deps.outputs.workflow_statuses }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Get workflow dependencies
+      id: workflow_dependencies
+      shell: bash
+      run: |
+        WORKFLOWS=$(yq -o=json -I=0 '.on.workflow_run.workflows' "${{ inputs.caller_workflow_path }}")
+        echo "list=$WORKFLOWS" >> $GITHUB_OUTPUT
+
+    - name: Check all workflow dependencies status
+      id: check_deps
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        HEAD_SHA: ${{ inputs.head_sha }}
+        DEPENDENCIES: ${{ steps.workflow_dependencies.outputs.list }}
+      run: bun "${{ github.action_path }}/scripts/check-workflow-dependencies.ts"
